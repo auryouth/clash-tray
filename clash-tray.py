@@ -39,7 +39,7 @@ def start_clash(icon, item):
         if not get_clash_status():
             home_dir = os.environ.get("USERPROFILE", "")
             subprocess.Popen(
-                ["sudo", "clash", "-f", f"{home_dir}/.config/clash-meta/config.yaml"],
+                ["sudo", "clash"],
                 creationflags=subprocess.CREATE_NO_WINDOW,
             )
             notify("Clash 启动成功！")
