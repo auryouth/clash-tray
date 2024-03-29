@@ -1,0 +1,32 @@
+name: Build and Release
+
+on:
+    push:
+
+jobs:
+    build:
+        runs-on: windows-latest
+        permissions: write-all
+
+        steps:
+            -   name: Checkout code
+                uses: actions/checkout@v4
+
+            -   name: Set up Python
+                uses: actions/setup-python@v5
+                with:
+                    python-version: '3.12'
+
+            -   name: Install dependencies
+                run: pip install -r requirements.txt
+
+            -   name: Build executable
+                run: pyinstaller --onefile --icon=Meta.ico --noconsole  --add-data "Meta.png;." --add-data "Meta.ico;."  clash-tray.py
+
+            -   name: Upload Release
+                uses: softprops/action-gh-release@v2
+                with:
+                  tag_name: release
+                  files: |
+                    ${{ github.workspace }}/dist/clash-tray.exe
+                  generate_release_notes: true
