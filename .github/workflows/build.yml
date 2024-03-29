@@ -22,6 +22,7 @@ jobs:
 
             -   name: Build executable
                 run: pyinstaller --onefile --icon=Meta.ico --noconsole  --add-data "Meta.png;." --add-data "Meta.ico;."  clash-tray.py
+            
             -   name: ls
                 run: ls -R
 
@@ -30,5 +31,5 @@ jobs:
                 with:
                   tag_name: release
                   files: |
-                    ${{ github.workspace }}/dist/clash-tray.exe
+                    ${{ github.workspace }}\dist\clash-tray.exe
                   generate_release_notes: true
