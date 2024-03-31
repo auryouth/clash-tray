@@ -1,37 +1,37 @@
 name: Build and Release
 
 on:
-    workflow_dispatch:
-    push:
-        tags:
-            - "v*"
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
 
 jobs:
-    build:
-        runs-on: windows-latest
-        permissions: write-all
+  build:
+    runs-on: windows-latest
+    permissions: write-all
 
-        steps:
-            -   name: Checkout code
-                uses: actions/checkout@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-            -   name: Set up Python
-                uses: actions/setup-python@v5
-                with:
-                    python-version: '3.12'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-            -   name: Install dependencies
-                run: pip install -r requirements.txt
+      - name: Install dependencies
+        run: pip install -r requirements.txt
 
-            -   name: Build executable
-                run: pyinstaller --onefile --icon=Meta.ico --noconsole  --add-data "Meta.png;." --add-data "Meta.ico;."  clash-tray.py
-            
-            -   name: ls
-                run: ls -R
+      - name: Build executable
+        run: pyinstaller --onefile --uac-admin --icon=Meta.ico --noconsole  --add-data "Meta.png;." --add-data "Meta.ico;."  clash-tray.py
 
-            -   name: Upload Release
-                uses: softprops/action-gh-release@v2
-                with:
-                  tag_name: ${{ github.ref_name }}
-                  files: dist/*
-                  generate_release_notes: true
+      - name: ls
+        run: ls -R
+
+      - name: Upload Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: dist/*
+          generate_release_notes: true
