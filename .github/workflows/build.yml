@@ -24,7 +24,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Build executable
-        run: pyinstaller --onefile --uac-admin --icon=Meta.ico --noconsole  --add-data "Meta.png;." --add-data "Meta.ico;."  clash-tray.py
+        run: pyinstaller --onefile --uac-admin --icon=Meta.ico --noconsole --add-data "Meta.ico;."  clash-tray.py
 
       - name: ls
         run: ls -R

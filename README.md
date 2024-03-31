@@ -2,7 +2,7 @@
 
 ## 打包命令
 ```bash
-pyinstaller --onefile --uac-admin --icon=Meta.ico --noconsole  --add-data "Meta.png;." --add-data "Meta.ico;."  clash-tray.py
+pyinstaller --onefile --uac-admin --icon=Meta.ico --noconsole --add-data "Meta.ico;."  clash-tray.py
 ```
 
 ## 缺陷
