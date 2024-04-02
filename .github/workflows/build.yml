@@ -21,10 +21,12 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
 
       - name: Build executable
-        run: pyinstaller --onefile --uac-admin --icon=Meta.ico --noconsole --add-data "Meta.ico;." --add-data "Meta-running.ico;." clash-tray.py
+        run: python pyinstaller.py
 
       - name: ls
         run: ls -R
