@@ -1,8 +1,9 @@
 import os
 import re
+import shutil
+import subprocess
 import sys
 import webbrowser
-from subprocess import CREATE_NO_WINDOW, PIPE
 from typing import Union
 
 import psutil
@@ -11,8 +12,20 @@ from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 
-class ClashTray(QSystemTrayIcon):
+class ClashTrayException(Exception):
+    def __init__(
+        self,
+        cause: str,
+        msg: str,
+        severity: QSystemTrayIcon.MessageIcon,
+    ):
+        super().__init__()
+        self.cause = cause
+        self.msg = msg
+        self.severity = severity
 
+
+class ClashTray(QSystemTrayIcon):
     def __init__(self, parent: QApplication = None):
         super().__init__(parent)
         self._tray_icon_normal_path = self.resource_path("icon/meta_normal.ico")
@@ -26,19 +39,72 @@ class ClashTray(QSystemTrayIcon):
         self.create_actions()
         self.create_tray_icon()
 
-        self._process: Union[psutil.Popen, None] = None
+        self._process: Union[psutil.Process, None] = None
         self._last_click_reason: Union[QSystemTrayIcon.ActivationReason, None] = None
 
-        self._clash_version = self.get_clash_version()
-
-        self.update_tooltip()
-
+        self._clash_config_path: str = os.path.join(
+            os.getenv("USERPROFILE"), ".config", "clash"
+        )
         self.show()
+        self.update_tray()
 
     def resource_path(self, relative_path: str) -> str:
         if hasattr(sys, "_MEIPASS"):
             return os.path.join(sys._MEIPASS, relative_path)
         return os.path.join(os.path.abspath("."), relative_path)
+
+    def check_clash_installed(self, cause: str) -> tuple[bool, str]:
+        commands_to_check = ["clash-meta-alpha", "clash-meta", "clash", "mihomo"]
+        try:
+            for cmd in commands_to_check:
+                if shutil.which(cmd):
+                    return True, cmd
+            err = (
+                "无法从下列命令列表中找到clash相关可执行程序：\n"
+                "[" + " ".join(commands_to_check) + "]\n"
+                "请检查是否已经安装clash"
+            )
+            raise ClashTrayException(
+                cause,
+                err,
+                QSystemTrayIcon.Critical,
+            )
+        except ClashTrayException as e:
+            self.showMessage(e.cause, e.msg, e.severity, 2000)
+            return False, "clash未安装"
+
+    def get_clash_version(self, cause: str) -> str:
+        clash_installed = self.check_clash_installed(cause)
+        if not clash_installed[0]:
+            return "版本未知"
+        ver_command = [clash_installed[1], "-v"]
+        pclash = subprocess.Popen(ver_command, stdout=subprocess.PIPE)
+        pclash.wait(1)
+        try:
+            func_name = sys._getframe().f_code.co_name
+            version_line = pclash.stdout.readline().strip().decode()
+            if not version_line:
+                err = (
+                    "clash版本信息输出有误\n"
+                    f"请检查函数 {func_name} 中下列命令\n"
+                    "版本输出命令：" + " ".join(ver_command) + "\n"
+                )
+                raise ClashTrayException(cause, err, QSystemTrayIcon.Critical)
+            regex = r"(\bv\d+\.\d+\.\d+\b|\balpha-[0-9a-f]+\b)"
+            regex_to_str = "".join(regex)
+            match = re.search(regex, version_line)
+            if not match.group(1):
+                err = (
+                    "clash版本信息匹配失败\n"
+                    f"请检查函数 {func_name} 中正则匹配\n"
+                    "正则表达式：" + "".join(regex) + "\n"
+                    "同时请检查程序版本信息输出"
+                )
+                raise ClashTrayException(cause, err, QSystemTrayIcon.Critical)
+            return match.group(1)
+        except ClashTrayException as e:
+            self.showMessage(e.cause, e.msg, e.severity, 2000)
+            return "版本未知"
 
     @Slot(QSystemTrayIcon.ActivationReason)
     def on_tray_icon_activated(self, reason: QSystemTrayIcon.ActivationReason):
@@ -52,131 +118,109 @@ class ClashTray(QSystemTrayIcon):
             self.on_double_click()
 
     def on_double_click_timeout(self):
-        if self._last_click_reason == QSystemTrayIcon.DoubleClick:
-            return
-        self.open_dashboard()
+        if self._last_click_reason != QSystemTrayIcon.DoubleClick:
+            self.open_dashboard()
 
     def on_double_click(self):
         self.toggle()
 
-    def start(self):
-        if self._process:
-            self.showMessage(
-                "clash",
-                "clash 已经在运行了",
-                QSystemTrayIcon.Warning,
-                1000,
-            )
-            return
-        try:
-            self._process = psutil.Popen(
-                "clash", stdout=PIPE, creationflags=CREATE_NO_WINDOW
-            )
-            gone, _ = psutil.wait_procs([self._process], timeout=1)
-            if self._process in gone:
-                err = self._process.stdout.read().decode()
-                self._process = None
-                raise Exception(err)
-            else:
-                self.update_tray_icon(True)
-                self.update_tooltip("on")
-        except Exception as e:
-            self.showMessage(
-                "clash",
-                f"clash 启动失败,错误信息：{e}",
-                QSystemTrayIcon.Critical,
-                2000,
-            )
-
-    def stop(self):
-        if self._process is None:
-            self.showMessage(
-                "clash",
-                "clash 已经关闭了",
-                QSystemTrayIcon.Warning,
-                1000,
-            )
-            return
-        try:
-            if not psutil.pid_exists(self._process.pid):
-                pass
-            else:
-                self._process.terminate()
-                _, alive = psutil.wait_procs([self._process], timeout=2)
-                if self._process in alive:
-                    self._process = self._process.kill()
-            self._process = None
-            self.update_tray_icon(False)
-            self.update_tooltip("off")
-        except Exception as e:
-            self.showMessage(
-                "clash",
-                f"clash 关闭失败，错误信息： {e}",
-                QSystemTrayIcon.Critical,
-                2000,
-            )
-
     def toggle(self):
-        if self._process:
-            self.stop()
+        try:
+            if self._process is None:
+                self.start_clash_process()
+            elif self._process.is_running():
+                self.stop_clash_process()
+            else:
+                self._process = None
+                err = (
+                    "clash子进程已经被额外操作意外关闭\n"
+                    "请检查是否有其他程序关闭了clash进程\n"
+                    "托盘图标状态将更新"
+                )
+                raise ClashTrayException(
+                    sys._getframe().f_code.co_name,
+                    err,
+                    QSystemTrayIcon.MessageIcon.Warning,
+                )
+        except ClashTrayException as e:
+            self.showMessage(e.cause, e.msg, e.severity, 2000)
+        finally:
+            self.update_tray()
+
+    def start_clash_process(self):
+        func_name = sys._getframe().f_code.co_name
+        if not self.clash_config_dir_exists(cause=func_name):
+            return
+        clash_installed = self.check_clash_installed(cause=func_name)
+        if not clash_installed[0]:
+            return
+        start_command = [clash_installed[1], "-d", self._clash_config_path]
+        proc = subprocess.Popen(
+            start_command,
+            stdout=subprocess.PIPE,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+        try:
+            gone, _ = psutil.wait_procs([proc], timeout=1)
+            if proc in gone:
+                err = proc.stdout.read().strip().decode()
+                raise ClashTrayException(
+                    " ".join(start_command), err, QSystemTrayIcon.MessageIcon.Critical
+                )
+            proc.stdout.close()
+            self._process = psutil.Process(proc.pid)
+        except ClashTrayException as e:
+            self.showMessage(e.cause, e.msg, e.severity, 2000)
+
+    def stop_clash_process(self):
+        self._process.terminate()
+        _, alive = psutil.wait_procs([self._process], timeout=2)
+        if self._process in alive:
+            self._process = self._process.kill()
+        self._process = None
+
+    def update_tray(self):
+        if self._process is None:
+            icon = self._tray_icon_normal
+            state = "off"
         else:
-            self.start()
+            icon = self._tray_icon_running
+            state = "on"
+
+        func_name = sys._getframe().f_code.co_name
+        tooltip = f"{self.check_clash_installed(func_name)[1]} {self.get_clash_version(func_name)}\nTun 模式: {state}"
+        self.setIcon(icon)
+        self.setToolTip(tooltip)
 
     def open_dashboard(self):
         webbrowser.open("https://d.metacubex.one")
 
-    def open_dir(self):
+    def clash_config_dir_exists(self, cause):
         try:
-            user_profile = os.getenv("USERPROFILE")
-            config_path = os.path.join(user_profile, ".config", "mihomo")
-            if not os.path.exists(config_path):
-                raise Exception(f"目录不存在: {config_path}")
-            psutil.Popen(["explorer", config_path])
-        except Exception as e:
-            self.showMessage(
-                "clash",
-                f"{e}",
-                QSystemTrayIcon.Critical,
-                2000,
-            )
+            if not os.path.exists(self._clash_config_path):
+                raise ClashTrayException(
+                    cause,
+                    f"目录不存在: {self._clash_config_path}",
+                    QSystemTrayIcon.Critical,
+                )
+            return True
+        except ClashTrayException as e:
+            self.showMessage(e.cause, e.msg, e.severity, 2000)
+            return False
+
+    def open_dir(self):
+        if not self.clash_config_dir_exists("打开目录失败"):
+            return
+        os.startfile(self._clash_config_path)
 
     def exit(self):
-        self.stop()
+        if self._process is not None and self._process.is_running():
+            self.stop_clash_process()
         qApp.quit()
-
-    def update_tray_icon(self, is_running: bool):
-        if is_running:
-            self.setIcon(self._tray_icon_running)
-        else:
-            self.setIcon(self._tray_icon_normal)
-
-    def get_clash_version(self) -> str:
-        try:
-            process = psutil.Popen(["clash", "-v"], stdout=PIPE)
-            output, _ = process.communicate()
-            version_line = output.decode().splitlines()[0]
-            match = re.search(r"v(\d+\.\d+\.\d+)", version_line)
-            if match:
-                return match.group(1)
-            else:
-                return ""
-        except Exception as e:
-            return ""
-
-    def update_tooltip(self, tun_mode: str = "off"):
-        tooltip = f"Clash Meta {self._clash_version}\nTun 模式: {tun_mode}"
-        self.setToolTip(tooltip)
 
     def create_actions(self):
         self._toggle_action = QAction("切换", self)
         self._toggle_action.triggered.connect(self.toggle, Qt.UniqueConnection)
-
-        self._start_action = QAction("启动", self)
-        self._start_action.triggered.connect(self.start, Qt.UniqueConnection)
-
-        self._stop_action = QAction("关闭", self)
-
-        self._stop_action.triggered.connect(self.stop, Qt.UniqueConnection)
 
         self._open_dashboard_action = QAction("打开面板", self)
         self._open_dashboard_action.triggered.connect(
@@ -192,11 +236,15 @@ class ClashTray(QSystemTrayIcon):
     def create_tray_icon(self):
         self._tray_icon_menu = QMenu()
         self._tray_icon_menu.addAction(self._toggle_action)
-        self._tray_icon_menu.addAction(self._start_action)
-        self._tray_icon_menu.addAction(self._stop_action)
         self._tray_icon_menu.addAction(self._open_dashboard_action)
         self._tray_icon_menu.addAction(self._open_dir_action)
         self._tray_icon_menu.addSeparator()
         self._tray_icon_menu.addAction(self._exit_action)
 
         self.setContextMenu(self._tray_icon_menu)
+
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    clash_tray = ClashTray(app)
+    sys.exit(app.exec())
