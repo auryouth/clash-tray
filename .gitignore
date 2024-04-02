@@ -2,3 +2,4 @@
 build
 dist
 clash-tray.spec
+__pycache__
