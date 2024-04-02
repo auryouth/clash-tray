@@ -78,7 +78,11 @@ class ClashTray(QSystemTrayIcon):
         if not clash_installed[0]:
             return "版本未知"
         ver_command = [clash_installed[1], "-v"]
-        pclash = subprocess.Popen(ver_command, stdout=subprocess.PIPE)
+        pclash = subprocess.Popen(
+            ver_command,
+            stdout=subprocess.PIPE,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
         pclash.wait(1)
         try:
             func_name = sys._getframe().f_code.co_name
@@ -91,7 +95,6 @@ class ClashTray(QSystemTrayIcon):
                 )
                 raise ClashTrayException(cause, err, QSystemTrayIcon.Critical)
             regex = r"(\bv\d+\.\d+\.\d+\b|\balpha-[0-9a-f]+\b)"
-            regex_to_str = "".join(regex)
             match = re.search(regex, version_line)
             if not match.group(1):
                 err = (
