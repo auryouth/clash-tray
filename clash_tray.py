@@ -54,7 +54,14 @@ class ClashTray(QSystemTrayIcon):
         return os.path.join(os.path.abspath("."), relative_path)
 
     def check_clash_installed(self, cause: str) -> tuple[bool, str]:
-        commands_to_check = ["clash-meta-alpha", "clash-meta", "clash", "mihomo"]
+        commands_to_check = [
+            "clash-meta-alpha",
+            "clash-alpha",
+            "mihomo-alpha",
+            "clash-meta",
+            "clash",
+            "mihomo",
+        ]
         try:
             for cmd in commands_to_check:
                 if shutil.which(cmd):
