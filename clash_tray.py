@@ -81,27 +81,28 @@ class ClashTray(QSystemTrayIcon):
         pclash = subprocess.Popen(
             ver_command,
             stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             creationflags=subprocess.CREATE_NO_WINDOW,
         )
         pclash.wait(1)
         try:
-            func_name = sys._getframe().f_code.co_name
-            version_line = pclash.stdout.readline().strip().decode()
-            if not version_line:
+            if pclash.returncode != 0:
                 err = (
-                    "clash版本信息输出有误\n"
-                    f"请检查函数 {func_name} 中下列命令\n"
-                    "版本输出命令：" + " ".join(ver_command) + "\n"
+                    "获取版本命令错误： "
+                    + " ".join(ver_command)
+                    + "\n"
+                    + pclash.stderr.read().strip().decode()
                 )
                 raise ClashTrayException(cause, err, QSystemTrayIcon.Critical)
+            version_line = pclash.stdout.readline().strip().decode()
             regex = r"(\bv\d+\.\d+\.\d+\b|\balpha-[0-9a-f]+\b)"
             match = re.search(regex, version_line)
-            if not match.group(1):
+            if not match or not match.group(1):
                 err = (
                     "clash版本信息匹配失败\n"
-                    f"请检查函数 {func_name} 中正则匹配\n"
+                    "请检查函数" + sys._getframe().f_code.co_name + "中正则匹配\n"
                     "正则表达式：" + "".join(regex) + "\n"
-                    "同时请检查程序版本信息输出"
+                    "同时请检查程序版本信息输出：\n" + version_line
                 )
                 raise ClashTrayException(cause, err, QSystemTrayIcon.Critical)
             return match.group(1)
@@ -152,9 +153,9 @@ class ClashTray(QSystemTrayIcon):
 
     def start_clash_process(self):
         func_name = sys._getframe().f_code.co_name
-        if not self.clash_config_dir_exists(cause=func_name):
+        if not self.clash_config_dir_exists(func_name):
             return
-        clash_installed = self.check_clash_installed(cause=func_name)
+        clash_installed = self.check_clash_installed(func_name)
         if not clash_installed[0]:
             return
         start_command = [clash_installed[1], "-d", self._clash_config_path]
@@ -191,7 +192,13 @@ class ClashTray(QSystemTrayIcon):
             state = "on"
 
         func_name = sys._getframe().f_code.co_name
-        tooltip = f"{self.check_clash_installed(func_name)[1]} {self.get_clash_version(func_name)}\nTun 模式: {state}"
+        tooltip = (
+            self.check_clash_installed(func_name)[1]
+            + self.get_clash_version(func_name)
+            + "\n"
+            + "Tun 模式："
+            + state
+        )
         self.setIcon(icon)
         self.setToolTip(tooltip)
 
@@ -203,7 +210,7 @@ class ClashTray(QSystemTrayIcon):
             if not os.path.exists(self._clash_config_path):
                 raise ClashTrayException(
                     cause,
-                    f"目录不存在: {self._clash_config_path}",
+                    "目录不存在：" + self._clash_config_path,
                     QSystemTrayIcon.Critical,
                 )
             return True
