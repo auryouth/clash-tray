@@ -194,6 +194,7 @@ class ClashTray(QSystemTrayIcon):
         func_name = sys._getframe().f_code.co_name
         tooltip = (
             self.check_clash_installed(func_name)[1]
+            + " "
             + self.get_clash_version(func_name)
             + "\n"
             + "Tun 模式："
