@@ -22,6 +22,7 @@ jobs:
           msystem: CLANG64
           update: true
           install: >-
+            zip
             mingw-w64-clang-x86_64-clang
             mingw-w64-clang-x86_64-clang-tools-extra
             mingw-w64-clang-x86_64-cmake
@@ -33,12 +34,20 @@ jobs:
           cmake -B build -G Ninja
           cmake --build build
 
+      - name: deploy
+        run: |
+          mkdir release
+          cp build/*.exe release/
+          cd release
+          ldd *.exe | grep clang64 | awk -F\> '{print $2}' | awk -F ' ' '{print $1}' | xargs -I {} cp {} ./
+          zip -r clashtray.zip .
+
       - name: upload production artifacts
         uses: actions/upload-artifact@v4
         with:
           name: clash-tray
           path: |
-            build/*.exe
+            build/*.zip
 
   Upload-Release:
     permissions: write-all
