@@ -47,7 +47,7 @@ jobs:
         with:
           name: clash-tray
           path: |
-            build/*.zip
+            release/*.zip
 
   Upload-Release:
     permissions: write-all
