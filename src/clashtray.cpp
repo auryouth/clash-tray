@@ -45,14 +45,14 @@ ClashTray::ClashTray() {
 void ClashTray::createActions() {
   qInfo() << __func__;
 
-  toggleAction = new QAction(tr("Toggle"), this);
+  toggleAction = new QAction("Toggle", this);
   connect(toggleAction, &QAction::triggered, this, &ClashTray::toggle);
 
-  openDashboardAction = new QAction(tr("Open Dashboard"), this);
+  openDashboardAction = new QAction("Open Dashboard", this);
   connect(openDashboardAction, &QAction::triggered,
           []() { Utils::openUrl(boardUrl); });
 
-  openDirAction = new QAction(tr("Open Directory"), this);
+  openDirAction = new QAction("Open Directory", this);
   connect(openDirAction, &QAction::triggered, [this]() {
     QString msg;
     bool exists = Utils::dirExists(clashConfigPath, msg);
@@ -64,7 +64,7 @@ void ClashTray::createActions() {
     Utils::openDir(clashConfigPath);
   });
 
-  exitAction = new QAction(tr("Exit"), this);
+  exitAction = new QAction("Exit", this);
   connect(exitAction, &QAction::triggered, this, &ClashTray::exitApplication);
 }
 
