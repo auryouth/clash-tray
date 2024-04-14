@@ -40,7 +40,7 @@ jobs:
           cp build/*.exe release/
           cd release
           # windeployqt-qt6.exe --no-compiler-runtime --no-translations --no-libraries  --no-system-d3d-compiler --skip-plugin-types generic,networkinformation,tls *.exe
-          windeployqt-qt6.exx *.exe
+          windeployqt-qt6.exe *.exe
           ldd *.exe |grep clang64  | awk -F\> '{print $2}' | awk -F ' ' '{print $1}' | xargs -I {} cp {} ./
           zip -r clashtray.zip .
 
