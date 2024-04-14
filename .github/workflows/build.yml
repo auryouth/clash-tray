@@ -39,7 +39,7 @@ jobs:
           mkdir release
           cp build/*.exe release/
           cd release
-          ldd *.exe | grep clang64 | awk -F\> '{print $2}' | awk -F ' ' '{print $1}' | xargs -I {} cp {} ./
+          windeployqt-qt6.exe --no-translations --no-system-d3d-compiler --skip-plugin-types styles,networkinformation,imageformats,tls,generic clashtray.exe
           zip -r clashtray.zip .
 
       - name: upload production artifacts
