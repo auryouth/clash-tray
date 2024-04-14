@@ -1,22 +1,41 @@
 cmake_minimum_required(VERSION 3.28)
 
-set(CMAKE_C_COMPILER clang)
+project(clashtray LANGUAGES CXX)
+
+set(CMAKE_AUTOMOC ON)
+
+# Generate the commands
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 set(CMAKE_CXX_COMPILER clang++)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O1 -fsanitize=address -fno-omit-frame-pointer")
-set(CMAKE_AUTOMOC ON)
 
-project(clashtray LANGUAGES CXX)
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
 
-set(CMAKE_BUILD_TYPE Release)
+# By default QMessageLogContext only works in Debug mode.
+# To make it permanent for all modes, we need to define QT_MESSAGELOGCONTEXT
+add_definitions("-DQT_MESSAGELOGCONTEXT")
 
 find_package(Qt6 COMPONENTS Core Gui Widgets REQUIRED)
 
 qt_standard_project_setup()
 
-qt_add_executable(${PROJECT_NAME} main.cpp clashtray.cpp logger.cpp utils.cpp icon.rc)
+include_directories(src)
+
+set(PROJECT_SOURCES
+    src/main.cpp
+    src/clashtray.cpp
+    src/logger.cpp
+    src/utils.cpp
+    clashtray.rc
+)
+
+qt_add_executable(${PROJECT_NAME} ${PROJECT_SOURCES})
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
     WIN32_EXECUTABLE TRUE
@@ -25,8 +44,8 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 target_link_libraries(${PROJECT_NAME} PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets)
 
 set(clashtray_resource_files
-    "images/meta_normal.ico"
-    "images/meta_running.ico"
+    "resources/meta_normal.ico"
+    "resources/meta_running.ico"
 )
 
 qt_add_resources(${PROJECT_NAME} "clashtray"
