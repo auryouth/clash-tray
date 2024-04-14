@@ -25,8 +25,8 @@ QString ClashTray::clashCommand = "Clash 未安装";
 QString ClashTray::clashVersion = "版本未知";
 
 ClashTray::ClashTray() {
-  trayIconNormal = QIcon(":/images/meta_normal.ico");
-  trayIconRunning = QIcon(":/images/meta_running.ico");
+  trayIconNormal = QIcon(":/resources/meta_normal.ico");
+  trayIconRunning = QIcon(":/resources/meta_running.ico");
   setIcon(trayIconNormal);
 
   connect(this, &QSystemTrayIcon::activated, this,
