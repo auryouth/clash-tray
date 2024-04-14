@@ -1,7 +1,6 @@
 #include "logger.hpp"
 
 #include <qlogging.h>
-#include <qstringliteral.h>
 
 #include <QDateTime>
 #include <QHash>

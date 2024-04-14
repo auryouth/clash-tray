@@ -10,7 +10,6 @@
 #include <QIcon>
 #include <QMenu>
 #include <QProcess>
-#include <QRegularExpressionMatch>
 #include <QRegularexpression>
 #include <QSystemTrayIcon>
 #include <QTimer>
