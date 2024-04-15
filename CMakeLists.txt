@@ -31,8 +31,8 @@ include_directories(src)
 set(PROJECT_SOURCES
     src/main.cpp
     src/clashtray.cpp
-    src/logger.cpp
-    src/utils.cpp
+    src/utils/logger.cpp
+    src/utils/utils.cpp
     clashtray.rc
 )
 

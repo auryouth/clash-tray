@@ -1,7 +1,6 @@
 #include "clashtray.hpp"
 
 #include <qcontainerfwd.h>
-#include <qlogging.h>
 
 #include <QAction>
 #include <QApplication>
@@ -14,7 +13,8 @@
 #include <QSystemTrayIcon>
 #include <QTimer>
 
-#include "utils.hpp"
+#include "utils/logger.hpp"
+#include "utils/utils.hpp"
 
 QStringList ClashTray::clashCommands = {
     "clash-meta-alpha", "clash-alpha", "mihomo-alpha",
@@ -43,7 +43,7 @@ ClashTray::ClashTray() {
 }
 
 void ClashTray::createActions() {
-  qInfo() << __func__;
+  LOG_INFO << __FUNCTION__;
 
   toggleAction = new QAction("Toggle", this);
   connect(toggleAction, &QAction::triggered, this, &ClashTray::toggle);
@@ -57,10 +57,10 @@ void ClashTray::createActions() {
     QString msg;
     bool exists = Utils::dirExists(clashConfigPath, msg);
     if (!exists) {
-      qWarning() << msg;
+      LOG_WARN << msg;
       showMessage("打开目录失败", msg, QSystemTrayIcon::Warning, 2000);
     };
-    qInfo() << msg;
+    LOG_INFO << msg;
     Utils::openDir(clashConfigPath);
   });
 
@@ -69,7 +69,7 @@ void ClashTray::createActions() {
 }
 
 void ClashTray::createTrayIcon() {
-  qInfo() << __func__;
+  LOG_INFO << __FUNCTION__;
 
   trayIconMenu = new QMenu();
   trayIconMenu->addAction(toggleAction);
@@ -87,7 +87,7 @@ void ClashTray::onTrayIconActivated(QSystemTrayIcon::ActivationReason reason) {
     QTimer::singleShot(QApplication::doubleClickInterval(), this,
                        &ClashTray::onDoubleClickTimeout);
   } else if (reason == QSystemTrayIcon::DoubleClick) {
-    qInfo() << "Double clicked";
+    LOG_INFO << "Double clicked";
     this->setProperty("lastActivateReason", reason);
     toggle();
   }
@@ -95,14 +95,14 @@ void ClashTray::onTrayIconActivated(QSystemTrayIcon::ActivationReason reason) {
 
 void ClashTray::onDoubleClickTimeout() {
   if (this->property("lastActivateReason") != QSystemTrayIcon::DoubleClick) {
-    qInfo() << this->property("lastActivateReason");
+    LOG_INFO << this->property("lastActivateReason");
 
     Utils::openUrl(boardUrl);
   }
 }
 
 void ClashTray::toggle() {
-  qInfo() << __func__;
+  LOG_INFO << __FUNCTION__;
   if (pclash == nullptr || pclash->state() == QProcess::NotRunning) {
     startClashProcess();
   } else {
@@ -111,54 +111,55 @@ void ClashTray::toggle() {
 }
 
 void ClashTray::exitApplication() {
-  qInfo() << __func__;
+  LOG_INFO << __FUNCTION__;
   safeStopClashProcess();
 
   qApp->quit();
 }
 
 auto ClashTray::checkAndFetchClashVersion() -> bool {
-  qInfo() << __func__;
+  LOG_INFO << __FUNCTION__;
   bool isClashFound = false;
 
-  qInfo() << "Checking regex validity";
+  LOG_INFO << "Checking regex validity";
   QRegularExpression regex(R"((\bv\d+\.\d+\.\d+\b|\balpha-[0-9a-f]+\b))");
   bool regexValid = true;
   if (!regex.isValid()) {
     clashVersion = "正则无效";
 
-    qCritical() << "Regex valid: " << !regexValid
-                << " Regex: " << regex.pattern();
-    qCritical() << "Regex error: " << regex.errorString();
-    qCritical() << "Clash Version is set to 'regex invalid'";
+    LOG_CRIT << "Regex valid: " << !regexValid << " Regex: " << regex.pattern();
+    LOG_CRIT << "Regex error: " << regex.errorString();
+    LOG_CRIT << "Clash Version is set to 'regex invalid'";
     showMessage("Regex 无效", regex.errorString(), QSystemTrayIcon::Critical,
                 2000);
     regexValid = false;
   } else {
-    qInfo() << "Regex valid: " << regexValid << " Regex: " << regex.pattern();
+    LOG_INFO << "Regex valid: " << regexValid << " Regex: " << regex.pattern();
   }
   auto* pcheck = new QProcess(this);
 
   foreach (const QString& cmd, clashCommands) {
-    qInfo() << "Checking clash: " << cmd;
     pcheck->start(cmd, QStringList() << "-v");
+    QString command =
+        pcheck->program().append(" ").append(pcheck->arguments().join(" "));
+    LOG_INFO << "Checking clash with command: " << command;
 
     if (pcheck->waitForFinished() && pcheck->exitCode() == 0) {
       isClashFound = true;
-      qInfo() << "Clash found: " << cmd;
+      LOG_INFO << "Clash executable found: " << cmd;
 
       clashCommand = cmd;
       if (regexValid) {
-        qInfo() << "Checking version with regex";
+        LOG_INFO << "Checking version with regex";
 
         QString output = pcheck->readAllStandardOutput();
         QRegularExpressionMatch match = regex.match(output);
         if (match.hasMatch()) {
           clashVersion = match.captured();
-          qInfo() << "Regex match: " << true << " version: " << clashVersion;
+          LOG_INFO << "Regex match: " << true << " version: " << clashVersion;
         } else {
-          qWarning() << "Regex match: " << false << " version: " << "unknown";
-          qWarning() << "Regex text: " << output;
+          LOG_WARN << "Regex match: " << false << " version: " << "unknown";
+          LOG_WARN << "Regex text: " << output;
 
           showMessage("正则匹配失败", "请查看日志详情",
                       QSystemTrayIcon::Warning, 2000);
@@ -167,10 +168,8 @@ auto ClashTray::checkAndFetchClashVersion() -> bool {
       break;
     }
 
-    QString command =
-        pcheck->program().append(" ").append(pcheck->arguments().join(" "));
-    qWarning() << "Check error: " << pcheck->error() << command;
-    qWarning() << pcheck->errorString();
+    LOG_WARN << "Check error: " << pcheck->error();
+    LOG_WARN << pcheck->errorString();
   };
 
   if (!isClashFound) {
@@ -182,7 +181,7 @@ auto ClashTray::checkAndFetchClashVersion() -> bool {
 }
 
 void ClashTray::startClashProcess() {
-  qInfo() << __func__;
+  LOG_INFO << __FUNCTION__;
   if (!checkAndFetchClashVersion()) {
     return;
   }
@@ -192,30 +191,31 @@ void ClashTray::startClashProcess() {
   connect(pclash, &QProcess::started, [this]() {
     QTimer::singleShot(500, [this]() {
       if (pclash->state() == QProcess::Running) {
-        qInfo() << "Clash started";
+        LOG_INFO << "Clash started";
         this->updateTray(true);
       }
     });
   });
 
   connect(pclash, &QProcess::errorOccurred, [this]() {
-    qCritical() << "Clash error type: " << pclash->error();
-    qCritical() << "Clash error: " << pclash->errorString();
+    LOG_CRIT << "Clash error type: " << pclash->error();
+    LOG_CRIT << "Clash error: " << pclash->errorString();
   });
   connect(pclash, &QProcess::finished, [this]() {
     // HACK clash 启动失败不会触发 errorOccurred
     //  无法从 readAllStandardError() 或者 errorString() 获取错误信息
     // 目前观察只有启动失败会返回 UnknownError Type
     if (pclash->error() == QProcess::UnknownError) {
-      qCritical() << "Clash start failed";
-      qCritical() << pclash->readAllStandardOutput();
-      showMessage("Clash 启动失败", pclash->readAllStandardOutput(),
-                  QSystemTrayIcon::Critical, 2000);
+      LOG_CRIT << "Clash start failed";
+      QString errorMessage = QString(pclash->readAll());
+      LOG_CRIT << errorMessage;
+      showMessage("Clash 启动失败", errorMessage, QSystemTrayIcon::Critical,
+                  2000);
     } else if (pclash->exitStatus() == QProcess::CrashExit) {
-      qCritical() << "Clash crash exit";
-      qCritical() << pclash->readAllStandardError();
+      LOG_CRIT << "Clash crash exit";
+      LOG_CRIT << pclash->readAllStandardError();
     } else {
-      qInfo() << "Clash finished";
+      LOG_INFO << "Clash finished";
     }
 
     updateTray(false);
@@ -226,14 +226,14 @@ void ClashTray::startClashProcess() {
 }
 
 void ClashTray::safeStopClashProcess() {
-  qInfo() << __func__;
+  LOG_INFO << __FUNCTION__;
   if (pclash != nullptr && pclash->state() == QProcess::Running) {
     pclash->close();
   }
 }
 
 void ClashTray::updateTray(bool running) {
-  qInfo() << __func__;
+  LOG_INFO << __FUNCTION__;
   setToolTip(tr("%1 %2").arg(clashCommand, clashVersion));
 
   if (running) {
@@ -243,5 +243,5 @@ void ClashTray::updateTray(bool running) {
     setIcon(trayIconNormal);
     setToolTip(toolTip().append("\nTun 模式: off"));
   }
-  qInfo() << "Tray updated: " << toolTip() << " running: " << running;
+  LOG_INFO << "Tray updated: " << toolTip() << " running: " << running;
 }
