@@ -1,14 +1,8 @@
-/*
- * FROM https://github.com/jaredtao/TaoLogger
- */
-
 #include "utils/logger.hpp"
 
-#include <debugapi.h>
 #include <qcontainerfwd.h>
 #include <qlogging.h>
 #include <qstringconverter_base.h>
-#include <qtpreprocessorsupport.h>
 
 #include <QCoreApplication>
 #include <QDateTime>
@@ -16,134 +10,86 @@
 #include <QFile>
 #include <QIODevice>
 #include <QMutex>
+#include <QStringLiteral>
 #include <QTextStream>
-#include <QtTypes>
-#include <array>
-#include <cstddef>
-
-#include "utils/logger_template.hpp"
 
 namespace Logger {
+
+static QDateTime startUpTime;
 static QString gLogDir;
-static int gLogMaxCount;
+static QString messagePattern;
+static QFile file;
 
 static void outputMessage(QtMsgType type, const QMessageLogContext& context,
                           const QString& msg);
-static void outputMessageAsync(QtMsgType type,
-                               const QMessageLogContext& context,
-                               const QString& msg);
 
-void initLog(const QString& logPath, int logMaxCount, bool async) {
-  if (async) {
-    qInstallMessageHandler(outputMessageAsync);
-  } else {
-    qInstallMessageHandler(outputMessage);
-  }
+static void setupPattern() {
+  QString colorCodePattern = QStringLiteral(
+      "%{if-debug}\x1b[37m%{endif}"      // White
+      "%{if-info}\x1b[32m%{endif}"       // Green
+      "%{if-warning}\x1b[35m%{endif}"    // Magenta
+      "%{if-critical}\x1b[31m%{endif}"   // Red
+      "%{if-fatal}\x1b[31;1m%{endif}");  // Red and bold
 
-  gLogDir = QCoreApplication::applicationDirPath() + "/" + logPath;
+  QString resetCode = QStringLiteral("\x1b[0m");  // Reset
+  QString messagePattern = QStringLiteral(
+      "[%{time yyyyMMdd h:mm:ss.zzz t} "
+      "%{if-debug}D%{endif}"     // debug
+      "%{if-info}I%{endif}"      // info
+      "%{if-warning}W%{endif}"   // warning
+      "%{if-critical}C%{endif}"  // critical
+      "%{if-fatal}F%{endif}]"    // fatal
+      " %{file}:%{line} - %{message}");
+
+  messagePattern.prepend(colorCodePattern).append(resetCode);
+  qSetMessagePattern(messagePattern);
+}
+
+void initLog(const QString& logPath, int logMaxCount) {
+  startUpTime = QDateTime::currentDateTime();
+  gLogPath = logPath;
+  static QString gLogDir =
+      QCoreApplication::applicationDirPath() + "/" + gLogPath;
   gLogMaxCount = logMaxCount;
+
+  setupPattern();
+
   QDir dir(gLogDir);
   if (!dir.exists()) {
     dir.mkpath(dir.absolutePath());
   }
+
   QStringList infoList = dir.entryList(QDir::Files, QDir::Name);
   while (infoList.size() > gLogMaxCount) {
     dir.remove(infoList.first());
     infoList.removeFirst();
   }
-}
 
-static void outputMessageAsync(QtMsgType type,
-                               const QMessageLogContext& context,
-                               const QString& msg) {
-  static const QString messageTemp = QString("<div class=\"%1\">%2</div>\r\n");
-  static const std::array<char, 5> typeList = {'d', 'w', 'c', 'f', 'i'};
-  static QMutex mutex;
-  static QFile file;
-  static QTextStream textStream;
-  static uint count = 0;
-  static const uint maxCount = 512;
-  Q_UNUSED(context);
-  QDateTime datetime = QDateTime::currentDateTime();
-  // 每小时一个文件
-  QString fileNameDt = datetime.toString("yyyy-MM-dd_hh");
+  QString fileNameDt = startUpTime.toString("yyyy-MM-dd_hh_mm_ss");
+  QString newfileName = QString("%1/%2_log.txt").arg(gLogDir).arg(fileNameDt);
 
-  // 每分钟一个文件
-  // QString fileNameDt = dt.toString("yyyy-MM-dd_hh_mm");
+  file.setFileName(newfileName);
+  file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
 
-  QString contentDt = datetime.toString("yyyy-MM-dd hh:mm:ss");
-  QString message = QString("%1 %2").arg(contentDt).arg(msg);
-  QString htmlMessage =
-      messageTemp.arg(typeList[static_cast<size_t>(type)]).arg(message);
-  QString newfileName = QString("%1/%2_log.html").arg(gLogDir).arg(fileNameDt);
-  mutex.lock();
-  if (file.fileName() != newfileName) {
-    if (file.isOpen()) {
-      file.close();
-    }
-    file.setFileName(newfileName);
-    bool exist = file.exists();
-    file.open(QIODevice::WriteOnly | QIODevice::Append);
-    textStream.setDevice(&file);
-
-    textStream.setEncoding(QStringConverter::Utf8);
-    if (!exist) {
-      textStream << logTemplate << "\r\n";
-    }
-  }
-  textStream << htmlMessage;
-  textStream.flush();
-  count += static_cast<uint>(htmlMessage.length());
-  if (count >= maxCount) {
-    file.close();
-    file.open(QIODevice::WriteOnly | QIODevice::Append);
-  }
-  mutex.unlock();
-#ifdef Q_OS_WIN
-  ::OutputDebugString(message.toStdWString().data());
-  ::OutputDebugString(L"\r\n");
-#else
-  fprintf(stderr, message.toStdString().data());
-#endif
+  qInstallMessageHandler(outputMessage);
 }
 
 static void outputMessage(QtMsgType type, const QMessageLogContext& context,
                           const QString& msg) {
-  static const QString messageTemp = QString("<div class=\"%1\">%2</div>\r\n");
-  static const std::array<char, 5> typeList = {'d', 'w', 'c', 'f', 'i'};
+  QString message = qFormatLogMessage(type, context, msg.trimmed());
+
   static QMutex mutex;
+  static QTextStream textStream;
 
-  Q_UNUSED(context);
-  QDateTime datetime = QDateTime::currentDateTime();
-
-  // 每小时一个文件
-  QString fileNameDt = datetime.toString("yyyy-MM-dd_hh");
-
-  // 每分钟一个文件
-  // QString fileNameDt = dt.toString("yyyy-MM-dd_hh_mm");
-
-  QString contentDt = datetime.toString("yyyy-MM-dd hh:mm:ss");
-  QString message = QString("%1 %2").arg(contentDt).arg(msg);
-  QString htmlMessage =
-      messageTemp.arg(typeList[static_cast<size_t>(type)]).arg(message);
-  QFile file(QString("%1/%2_log.html").arg(gLogDir).arg(fileNameDt));
   mutex.lock();
+  if (file.isOpen()) {
+    textStream.setDevice(&file);
 
-  bool exist = file.exists();
-  file.open(QIODevice::WriteOnly | QIODevice::Append);
-  QTextStream textStream(&file);
-  textStream.setEncoding(QStringConverter::Utf8);
-  if (!exist) {
-    textStream << logTemplate << "\r\n";
+    textStream.setEncoding(QStringConverter::Utf8);
+
+    textStream << message << Qt::endl;
+    textStream.flush();
   }
-  textStream << htmlMessage;
-  file.close();
   mutex.unlock();
-#ifdef Q_OS_WIN
-  ::OutputDebugString(message.toStdWString().data());
-  ::OutputDebugString(L"\r\n");
-#else
-  fprintf(stderr, message.toStdString().data());
-#endif
 }
 }  // namespace Logger

@@ -6,44 +6,54 @@
 
 #include <QAction>
 #include <QIcon>
+#include <QPointer>
 #include <QProcess>
 #include <QSystemTrayIcon>
+
+#include "utils/clash_process_mgr.hpp"
 
 class ClashTray : public QSystemTrayIcon {
   Q_OBJECT
 
  public:
   explicit ClashTray();
+  enum MyActivationReason {
+    Unknown = QSystemTrayIcon::Unknown,
+    Context = QSystemTrayIcon::Context,
+    DoubleClick = QSystemTrayIcon::DoubleClick,
+    Trigger = QSystemTrayIcon::Trigger,
+    MiddleClick = QSystemTrayIcon::MiddleClick
+  };
+  Q_ENUM(MyActivationReason)
 
  private slots:
 
   void onTrayIconActivated(QSystemTrayIcon::ActivationReason reason);
-  void onDoubleClickTimeout();
-  void toggle();
   void exitApplication();
   void updateTray(bool running = false);
-  void startClashProcess();
-  void safeStopClashProcess();
+  void startClashManager();
+  // void safeStopClashProcess();
 
  private:  // NOLINT
-  static QStringList clashCommands;
-  static QString clashConfigPath;
-  static QString boardUrl;
-  static QString clashCommand;
-  static QString clashVersion;
-
+  QStringList clashCommands;
+  QString clashConfigPath;
+  QString boardUrl;
+  QString clashCommand;
+  QString clashVersion;
   QIcon trayIconNormal;
   QIcon trayIconRunning;
+
   QAction* toggleAction;
   QAction* openDashboardAction;
   QAction* openDirAction;
   QAction* exitAction;
   QMenu* trayIconMenu;
-  QProcess* pclash = nullptr;
+  QPointer<ClashProcessManager> cManager = nullptr;
 
-  auto checkAndFetchClashVersion() -> bool;
+  void initClashConfig();
   void createActions();
   void createTrayIcon();
+  auto checkAndFetchClashVersion() -> bool;
 };
 
 #endif  // CLASHTRAY_HPP
