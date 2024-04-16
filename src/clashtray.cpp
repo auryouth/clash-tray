@@ -39,10 +39,11 @@ void ClashTray::initClashConfig() {
 
   clashCommands = {"clash-meta-alpha", "clash-alpha", "mihomo-alpha",
                    "clash-meta",       "clash",       "mihomo"};
-  clashConfigPath = QDir::homePath() + "/.config/clash";
+  clashConfigDir = QDir::homePath() + "/.config/clash";
   boardUrl = "https://d.metacubex.one";
   clashCommand = "Clash 未安装";
   clashVersion = "版本未知";
+  clashConfigName = "config.yaml";
 }
 
 void ClashTray::createActions() {
@@ -72,15 +73,29 @@ void ClashTray::createActions() {
   openDirAction = new QAction("Open Directory", this);
   connect(openDirAction, &QAction::triggered, [this]() {
     QString msg;
-    bool exists = Utils::dirExists(clashConfigPath, msg);
+    bool exists = Utils::dirExists(clashConfigDir, msg);
     if (!exists) {
       showMessage("打开目录失败", msg, QSystemTrayIcon::Warning, 2000);
     } else {
-      Utils::openDir(clashConfigPath);
+      Utils::openDir(clashConfigDir);
     }
   });
 
-  // 4.Exit action
+  // 4.Open Config action
+  openConfigAction = new QAction("Open Config", this);
+  connect(openConfigAction, &QAction::triggered, [this]() {
+    QString configFilePath = clashConfigDir + "/" + clashConfigName;
+    QString err;
+    if (!Utils::fileExists(configFilePath, err)) {
+      showMessage("配置文件不存在", configFilePath, QSystemTrayIcon::Warning,
+                  2000);
+      return;
+    }
+
+    Utils::openFile(configFilePath);
+  });
+
+  // 5.Exit action
   exitAction = new QAction("Exit", this);
   connect(exitAction, &QAction::triggered, this, &ClashTray::exitApplication);
 }
@@ -92,6 +107,7 @@ void ClashTray::createTrayIcon() {
   trayIconMenu->addAction(toggleAction);
   trayIconMenu->addAction(openDashboardAction);
   trayIconMenu->addAction(openDirAction);
+  trayIconMenu->addAction(openConfigAction);
   trayIconMenu->addSeparator();
   trayIconMenu->addAction(exitAction);
   setContextMenu(trayIconMenu);
@@ -164,7 +180,7 @@ void ClashTray::startClashManager() {
   LOG_INFO << __FUNCTION__;
 
   QString err;
-  if (!Utils::dirExists(clashConfigPath, err)) {
+  if (!Utils::dirExists(clashConfigDir, err)) {
     showMessage("Clash 配置目录不存在", err, QSystemTrayIcon::Critical, 2000);
     toggleAction->setChecked(false);
     return;
@@ -176,8 +192,8 @@ void ClashTray::startClashManager() {
   }
 
   cManager = new ClashProcessManager(this);
-  QStringList runArgs = {"-d", clashConfigPath};
-  QStringList testArgs = {"-d", clashConfigPath, "-t"};
+  QStringList runArgs = {"-d", clashConfigDir};
+  QStringList testArgs = {"-d", clashConfigDir, "-t"};
 
   connect(cManager, &ClashProcessManager::pclashStarted, this,
           [this]() { updateTray(true); });

@@ -36,16 +36,18 @@ class ClashTray : public QSystemTrayIcon {
 
  private:  // NOLINT
   QStringList clashCommands;
-  QString clashConfigPath;
+  QString clashConfigDir;
   QString boardUrl;
   QString clashCommand;
   QString clashVersion;
+  QString clashConfigName;
   QIcon trayIconNormal;
   QIcon trayIconRunning;
 
   QAction* toggleAction;
   QAction* openDashboardAction;
   QAction* openDirAction;
+  QAction* openConfigAction;
   QAction* exitAction;
   QMenu* trayIconMenu;
   QPointer<ClashProcessManager> cManager = nullptr;

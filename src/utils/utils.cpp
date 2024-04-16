@@ -24,6 +24,19 @@ auto Utils::dirExists(const QString& dirPath, QString& message) -> bool {
   return true;
 }
 
+auto Utils::fileExists(const QString& filePath, QString& message) -> bool {
+  if (!QFile(filePath).exists()) {
+    LOG_WARNING << "filePath does not exist:" << filePath;
+    message = "filePath does not exist: " + filePath;
+
+    return false;
+  }
+
+  LOG_INFO << "Found filePath:" << filePath;
+  message = "Found filePath: " + filePath;
+  return true;
+}
+
 void Utils::openUrl(const QString& url) {
   LOG_INFO << __FUNCTION__ << url;
   QDesktopServices::openUrl(QUrl(url));
@@ -32,6 +45,11 @@ void Utils::openUrl(const QString& url) {
 void Utils::openDir(const QString& dirPath) {
   LOG_INFO << __FUNCTION__ << dirPath;
   QDesktopServices::openUrl(QUrl::fromLocalFile(dirPath));
+}
+
+void Utils::openFile(const QString& filePath) {
+  LOG_INFO << __FUNCTION__ << filePath;
+  QDesktopServices::openUrl(QUrl::fromLocalFile(filePath));
 }
 
 auto Utils::regexMatch(const QString& regexPattern,
